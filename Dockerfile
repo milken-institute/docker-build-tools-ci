@@ -22,7 +22,7 @@ RUN apt-get update && \
 RUN docker-php-ext-configure intl
 RUN docker-php-ext-install intl
 
-RUN docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/
+RUN docker-php-ext-configure gd
 RUN docker-php-ext-install gd
 
 RUN docker-php-ext-configure sodium
@@ -55,10 +55,16 @@ RUN apt-get install -y ruby jq curl rsync
 RUN gem install circle-cli
 
 # Make sure we are on the latest version of Composer
-RUN composer selfupdate
+WORKDIR /opt
+RUN git clone https://github.com/composer/composer.git
+WORKDIR /opt/composer
+RUN git checkout 1.10
+RUN composer install
+RUN composer compile
+RUN mv /usr/local/bin/composer /usr/local/bin/composer2
+RUN ln -s /opt/composer/bin/composer /usr/local/bin
 
-# Parallel Composer downloads
-RUN composer -n global require -n "hirak/prestissimo:^0.3"
+WORKDIR /build-tools-ci
 
 # Create an unpriviliged test user
 RUN groupadd -g 999 tester && \
@@ -94,8 +100,11 @@ RUN composer -n create-project --no-dev -d /usr/local/share/terminus-plugins pan
 RUN composer -n create-project --no-dev -d /usr/local/share/terminus-plugins pantheon-systems/terminus-mass-update:^1.1
 RUN composer -n create-project --no-dev -d /usr/local/share/terminus-plugins pantheon-systems/terminus-site-clone-plugin:^2
 
+
 # Add hub in case anyone wants to automate GitHub PR creation, etc.
-RUN curl -LO https://github.com/github/hub/releases/download/v2.11.2/hub-linux-amd64-2.11.2.tgz && tar xzvf hub-linux-amd64-2.11.2.tgz && ln -s /build-tools-ci/hub-linux-amd64-2.11.2/bin/hub /usr/local/bin/hub
+env GITHUBRELEASE 2.14.2
+RUN curl -LO https://github.com/github/hub/archive/v2.14.2.tar.gz
+RUN tar -xzvf v${GITHUBRELEASE}.tar.gz && ln -s /build-tools-ci/hub-linux-amd64-${GITHUBRELEASE}/bin/hub /usr/local/bin/hub
 
 # Add lab in case anyone wants to automate GitLab MR creation, etc.
 RUN curl -s https://raw.githubusercontent.com/zaquestion/lab/master/install.sh | bash
